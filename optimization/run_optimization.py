@@ -252,12 +252,6 @@ if __name__ == "__main__":
         help="Path to facial recognition network used in ID loss",
     )
     parser.add_argument(
-        "--segmentation_model",
-        default="face_segmentation",
-        type=str,
-        help="Which segmentation model to use, either linear_segmentation, face_segmentation or stuff_segmentation",
-    )
-    parser.add_argument(
         "--semantic_parts",
         default=["hair"],
         type=str,

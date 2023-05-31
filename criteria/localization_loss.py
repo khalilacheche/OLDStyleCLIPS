@@ -6,22 +6,6 @@ import torchvision
 from PIL import Image
 
 
-def _load_gan_linear_segmentation(model_path):
-    """
-    You can download the pretrained model from this repository
-    https://github.com/AtlantixJJ/LinearGAN
-    Semantic segmentation using a linear transformation on GAN features.
-    """
-    from linear_segmentation.semantic_extractor import EXTRACTOR_POOL
-
-    data = torch.load(model_path)
-    model_type = data["arch"]["type"]
-    model = EXTRACTOR_POOL[model_type](**data["arch"])
-    model.load_state_dict(data["param"])
-    model = model.eval()
-    return model
-
-
 def _load_face_bisenet_model(model_path):
     """
     You can download the pretrained model from this repository
@@ -31,32 +15,6 @@ def _load_face_bisenet_model(model_path):
 
     model = BiSeNet(n_classes=19)
     model.load_state_dict(torch.load(model_path))
-    model = model.eval()
-    return model
-
-
-def _load_cocostuff_deeplabv2(model_path):
-    from models.deeplab.deeplabv2 import DeepLabV2
-    from models.deeplab.msc import MSC
-
-    """
-    You can download the pretrained model from this repository
-    https://github.com/kazuto1011/deeplab-pytorch
-    """
-
-    def DeepLabV2_ResNet101_MSC(n_classes):
-        return MSC(
-            base=DeepLabV2(
-                n_classes=n_classes,
-                n_blocks=[3, 4, 23, 3],
-                atrous_rates=[6, 12, 18, 24],
-            ),
-            scales=[0.5, 0.75],
-        )
-
-    model = DeepLabV2_ResNet101_MSC(n_classes=182)
-    state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
-    model.load_state_dict(state_dict)
     model = model.eval()
     return model
 
@@ -86,22 +44,12 @@ class LocalizationLoss(nn.Module):
         super(LocalizationLoss, self).__init__()
         self.opts = opts
         print("Loading Segmentation Models")
-        segmentation_model_string = opts.segmentation_model
         self.device = torch.device("cuda")
-        assert segmentation_model_string in [
-            "face_segmentation",
-            "stuff_segmentation",
-        ]
-        if segmentation_model_string == "stuff_segmentation":
-            segmentation_model = _load_cocostuff_deeplabv2(
-                "pretrained/cocostuff_deeplab/deeplabv2_resnet101_msc-cocostuff164k-100000.pth"
-            )
-            self.segmentation_model = StuffSegmentation(segmentation_model)
-        elif segmentation_model_string == "face_segmentation":
-            segmentation_model = _load_face_bisenet_model(
-                "pretrained/face_bisenet/model.pth"
-            )
-            self.segmentation_model = FaceSegmentation(segmentation_model, self.device)
+
+        segmentation_model = _load_face_bisenet_model(
+            "pretrained/face_bisenet/model.pth"
+        )
+        self.segmentation_model = FaceSegmentation(segmentation_model, self.device)
         self.semantic_parts = opts.semantic_parts
 
     def get_semantic_parts(self, text):
@@ -126,8 +74,6 @@ class LocalizationLoss(nn.Module):
 
     ### Batch data should now be coming from the generator, instead of the direct image outoput of the gan
     def forward(self, batch_data, new_batch_data, text, i):
-        # print(batch_data.keys())
-
         last_layer_res = None
         localization_loss = 0
         localization_layers = list(range(1, 10))
@@ -150,24 +96,13 @@ class LocalizationLoss(nn.Module):
         loss_function = loss_functions[1]
         mode = "background"
 
-        if isinstance(self.segmentation_model, GANLinearSegmentation):
-            old_segmentation_output = self.segmentation_model.predict(
-                batch_data, one_hot=False
-            )
-        else:
-            old_segmentation_output = self.segmentation_model.predict(
-                raw_image_to_pil_image(batch_data["image"]), one_hot=False
-            )
+        old_segmentation_output = self.segmentation_model.predict(
+            raw_image_to_pil_image(batch_data["image"]), one_hot=False
+        )
         segmentation_output_res = old_segmentation_output.shape[2]
-
-        if isinstance(self.segmentation_model, GANLinearSegmentation):
-            new_segmentation_output = self.segmentation_model.predict(
-                new_batch_data, one_hot=False
-            )
-        else:
-            new_segmentation_output = self.segmentation_model.predict(
-                raw_image_to_pil_image(new_batch_data["image"]), one_hot=False
-            )
+        new_segmentation_output = self.segmentation_model.predict(
+            raw_image_to_pil_image(new_batch_data["image"]), one_hot=False
+        )
 
         semantic_parts = self.get_semantic_parts(text)
 
@@ -225,23 +160,12 @@ class LocalizationLoss(nn.Module):
             if mode == "background":
                 indicator = 1 - indicator
 
-            # print('Diff shape: {}'.format(diff.shape))
-            # print('Indicator shape: {}'.format(indicator.shape))
-            # print('1st term: {}'.format(torch.sum(diff * indicator, dim=[1, 2])))
-            # print('2nd term: {}'.format(torch.sum(diff, dim=[1, 2]) + 1e-6))
-
             localization_loss = (
                 layer_weight * torch.sum(diff * indicator, dim=[1, 2])[0]
             )
-
-            # 0.0 means perfect localization and 1.0 means poor localization
             localization_loss = torch.mean(localization_loss)
 
-            # print("Localization loss: {}.".format(localization_loss))
-
         pil_to_tensor = torchvision.transforms.ToTensor()
-
-        # print('Image shape: {}.'.format(batch_data["image"].shape))
 
         old_image = pil_to_tensor(raw_image_to_pil_image(batch_data["image"])[0])
         old_mask_image = (
