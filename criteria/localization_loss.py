@@ -19,18 +19,6 @@ def _load_face_bisenet_model(model_path):
     return model
 
 
-def combine_mask(mask1, mask2, method="left_only"):
-    assert method in ["average", "union", "intersection", "left_only"]
-    if method == "average":
-        return 0.5 * mask1 + 0.5 * mask2
-    elif method == "intersection":
-        return mask1 * mask2
-    elif method == "union":
-        return mask1 + mask2 - mask1 * mask2
-    else:
-        return mask1
-
-
 def raw_image_to_pil_image(raw_img):
     img = (raw_img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
     pil_imgs = []
@@ -40,6 +28,16 @@ def raw_image_to_pil_image(raw_img):
 
 
 class LocalizationLoss(nn.Module):
+    """
+    Custom module for calculating the localization loss.
+    The localization loss is calculated by calculating the mean squared difference between the pixels that are outside of the semantic parts that we want to edit.
+    The loss is higher the more the pixels outside of the semantic parts are changed.
+
+    Args:
+        opts (argparse.Namespace): Options and settings for the localization loss.
+
+    """
+
     def __init__(self, opts):
         super(LocalizationLoss, self).__init__()
         self.opts = opts
@@ -74,9 +72,24 @@ class LocalizationLoss(nn.Module):
 
     ### Batch data should now be coming from the generator, instead of the direct image outoput of the gan
     def forward(self, batch_data, new_batch_data, text, i):
+        """
+        Performs forward pass of the localization loss.
+
+        Args:
+            batch_data (dict): Batch data from the generator.
+            new_batch_data (dict): New batch data from the generator.
+            text (str): Input text.
+            i (int): Index in the optimization.
+
+        Returns:
+            torch.Tensor: Loss value.
+
+        """
         last_layer_res = None
         localization_loss = 0
         localization_layers = list(range(1, 10))
+        # Set the weights for the localization layers
+        # for now, as we are only using the last layer, the weight is 1 for the last layer and 0 for all other layers
         localization_layer_weights = np.array(
             [0.0] * (len(localization_layers) - 1) + [1.0]
         )
@@ -92,9 +105,6 @@ class LocalizationLoss(nn.Module):
             8: 512,
             9: 1024,
         }
-        loss_functions = ["L1", "L2", "cos"]
-        loss_function = loss_functions[1]
-        mode = "background"
 
         old_segmentation_output = self.segmentation_model.predict(
             raw_image_to_pil_image(batch_data["image"]), one_hot=False
@@ -119,13 +129,14 @@ class LocalizationLoss(nn.Module):
         for part_idx in part_ids:
             new_mask += 1.0 * (new_segmentation_output == part_idx)
 
-        mask_aggregation = "left_only"
-
-        combined_mask = combine_mask(old_mask, new_mask, mask_aggregation)
+        combined_mask = old_mask
 
         mask = combined_mask.clone()
 
-        # To maximize the Localization Score in localization layers
+        # Calculate the loss for each layer of the generator
+        # For now, the calculation is done for the last layer only, but it can be extended to all layers
+        localization_layers = localization_layers[-1:]
+        localization_layer_weights = [localization_layer_weights[-1]]
         for layer, layer_weight in zip(
             reversed(localization_layers), reversed(localization_layer_weights)
         ):
@@ -146,19 +157,10 @@ class LocalizationLoss(nn.Module):
 
             x1 = batch_data[f"layer_{layer}"].detach()
             x2 = new_batch_data[f"layer_{layer}"]
-            if loss_function == "L1":
-                diff = torch.mean(torch.abs(x1 - x2), dim=1)
-            elif loss_function == "L2":
-                diff = torch.mean(torch.square(x1 - x2), dim=1)
-            elif loss_function == "cos":
-                diff = 1 - torch.nn.functional.cosine_similarity(
-                    x1, x2, dim=1, eps=1e-8
-                )
-            else:
-                diff = torch.mean(torch.square(x1 - x2), dim=1)
-            indicator = mask[:, 0]
-            if mode == "background":
-                indicator = 1 - indicator
+
+            diff = torch.mean(torch.square(x1 - x2), dim=1)
+
+            indicator = 1 - mask[:, 0]
 
             localization_loss = (
                 layer_weight * torch.sum(diff * indicator, dim=[1, 2])[0]

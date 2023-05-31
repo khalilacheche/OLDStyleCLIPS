@@ -5,10 +5,20 @@ from models.facial_recognition.model_irse import Backbone
 
 
 class IDLoss(nn.Module):
+    """
+    Custom module for calculating the ID loss.
+
+    Args:
+        opts (argparse.Namespace): Options and settings for the ID loss.
+
+    """
+
     def __init__(self, opts):
         super(IDLoss, self).__init__()
-        print('Loading ResNet ArcFace')
-        self.facenet = Backbone(input_size=112, num_layers=50, drop_ratio=0.6, mode='ir_se')
+        print("Loading ResNet ArcFace")
+        self.facenet = Backbone(
+            input_size=112, num_layers=50, drop_ratio=0.6, mode="ir_se"
+        )
         self.facenet.load_state_dict(torch.load(opts.ir_se50_weights))
         self.pool = torch.nn.AdaptiveAvgPool2d((256, 256))
         self.face_pool = torch.nn.AdaptiveAvgPool2d((112, 112))
@@ -17,6 +27,16 @@ class IDLoss(nn.Module):
         self.opts = opts
 
     def extract_feats(self, x):
+        """
+        Extracts features from the input tensor.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Extracted features.
+
+        """
         if x.shape[2] != 256:
             x = self.pool(x)
         x = x[:, :, 35:223, 32:220]  # Crop interesting region
@@ -25,6 +45,17 @@ class IDLoss(nn.Module):
         return x_feats
 
     def forward(self, y_hat, y):
+        """
+        Performs forward pass of the ID loss.
+
+        Args:
+            y_hat (torch.Tensor): Generated image tensor.
+            y (torch.Tensor): Target image tensor.
+
+        Returns:
+            torch.Tensor: Loss value.
+
+        """
         n_samples = y.shape[0]
         y_feats = self.extract_feats(y)  # Otherwise use the feature from there
         y_hat_feats = self.extract_feats(y_hat)

@@ -24,6 +24,19 @@ STYLESPACE_INDICES_WITHOUT_TORGB = [
 
 
 def get_lr(t, initial_lr, rampdown=0.25, rampup=0.05):
+    """
+    Calculates the learning rate based on the current training step.
+
+    Args:
+        t (float): Current training step.
+        initial_lr (float): Initial learning rate.
+        rampdown (float, optional): Duration of the learning rate ramp-down phase. Default is 0.25.
+        rampup (float, optional): Duration of the learning rate ramp-up phase. Default is 0.05.
+
+    Returns:
+        float: Calculated learning rate.
+
+    """
     lr_ramp = min(1, (1 - t) / rampdown)
     lr_ramp = 0.5 - 0.5 * math.cos(lr_ramp * math.pi)
     lr_ramp = lr_ramp * min(1, t / rampup)
@@ -32,17 +45,40 @@ def get_lr(t, initial_lr, rampdown=0.25, rampup=0.05):
 
 
 def main(args):
+    """
+    Main function for image editing based on text guidance using a GAN.
+
+    Args:
+        args (argparse.Namespace): Command-line arguments.
+
+    Returns:
+        dict: Output dictionary containing various results and information.
+            "orig_image": original image,
+            "orig_latent": original latent code,
+            "gen_image": generated image,
+            "latent_dir": found latent direction,
+            "losses" : dictionary of the losses of the last iteration,
+            "lambdas" : dictionary of the lambdas used for the losses of the last iteration,
+            "generator": generator network
+    """
+    # Check if generator checkpoint exists
     ensure_checkpoint_exists(args.ckpt)
+
+    # Tokenize text inputs
     text_inputs = torch.cat([clip.tokenize(args.description)]).cuda()
+
+    # Create directory for results
     shutil.rmtree(args.results_dir, ignore_errors=True)
     os.makedirs(args.results_dir, exist_ok=True)
 
+    # Load pre-trained GAN model
     g_ema = Generator(args.stylegan_size, 512, 8)
     g_ema.load_state_dict(torch.load(args.ckpt)["g_ema"], strict=False)
     g_ema.eval()
     g_ema = g_ema.cuda()
     mean_latent = g_ema.mean_latent(4096)
 
+    # Initialize latent code for image generation
     if args.latent_path:
         latent_code_init = torch.load(args.latent_path).cuda()
     else:
@@ -54,12 +90,12 @@ def main(args):
                 truncation=args.truncation,
                 truncation_latent=mean_latent,
             )
-
+    # Generate initial image
     with torch.no_grad():
         result_orig, _ = g_ema(
             [latent_code_init], input_is_latent=True, randomize_noise=False
         )
-
+    # Perform image editing in style space or latent space
     if args.work_in_stylespace:
         with torch.no_grad():
             _, _, latent_code_init = g_ema(
@@ -73,22 +109,25 @@ def main(args):
         latent = latent_code_init.detach().clone()
         latent.requires_grad = True
 
+    # Initialize loss functions
     clip_loss = CLIPLoss(args)
     id_loss = IDLoss(args)
     localization_loss = LocalizationLoss(args)
 
+    # Initialize optimizer
     if args.work_in_stylespace:
         optimizer = optim.Adam(latent, lr=args.lr)
     else:
         optimizer = optim.Adam([latent], lr=args.lr)
 
     pbar = tqdm(range(args.step))
-
+    # Start optimization loop
     for i in pbar:
         t = i / args.step
         lr = get_lr(t, args.lr)
         optimizer.param_groups[0]["lr"] = lr
 
+        # Generate edited image
         result_gen, _ = g_ema(
             [latent],
             input_is_latent=True,
@@ -97,6 +136,7 @@ def main(args):
             return_all_layers=True,
         )
 
+        # Calculate losses
         c_loss = clip_loss(result_gen["image"], text_inputs)
         loc_loss = localization_loss(result_orig, result_gen, text_inputs, i)
 
@@ -121,22 +161,25 @@ def main(args):
             + args.loc_lambda * loc_loss
         )
 
+        # Update latent code
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         latent_dir = (
-            [(latent_code_init[c] - latent[c]) for c in range(len(latent_code_init))]
+            [(latent[c] - latent_code_init[c]) for c in range(len(latent_code_init))]
             if (args.work_in_stylespace)
             else latent - latent_code_init
         )
-
+        # Update progress bar
         pbar.set_description(
             (f"loss: {loss.item():.4f}, loc_loss: {loc_loss.item():.1f};")
         )
+
         if (
             args.save_intermediate_image_every > 0
             and i % args.save_intermediate_image_every == 0
         ):
+            # Save intermediate results
             with torch.no_grad():
                 result_gen, _ = g_ema(
                     [latent],
@@ -151,7 +194,8 @@ def main(args):
                 normalize=True,
                 range=(-1, 1),
             )
-    # note: the losses correspond to the loss just before the last optimization step
+
+    # Return final results
     output = {
         "orig_image": result_orig["image"],
         "orig_latent": latent_code_init,
@@ -266,7 +310,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    result_image = main(args)
+    result_image = main(args)["gen_image"]
 
     torchvision.utils.save_image(
         result_image.detach().cpu(),
