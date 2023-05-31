@@ -177,7 +177,7 @@ def main(args):
 
         if (
             args.save_intermediate_image_every > 0
-            and i % args.save_intermediate_image_every == 0
+            and (i + 1) % args.save_intermediate_image_every == 0
         ):
             # Save intermediate results
             with torch.no_grad():

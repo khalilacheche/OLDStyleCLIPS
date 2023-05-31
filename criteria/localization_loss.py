@@ -187,14 +187,18 @@ class LocalizationLoss(nn.Module):
             .detach()
             .cpu()
         )
-        if self.opts.export_segmentation_image:
+        if (
+            self.opts.export_segmentation_image
+            and self.opts.save_intermediate_image_every > 0
+            and (i + 1) % self.opts.save_intermediate_image_every == 0
+        ):
             images = [old_image, old_mask_image, new_image, new_mask_image]
             image_grid = torchvision.utils.make_grid(images, nrow=2)
             torchvision.utils.save_image(
                 image_grid,
                 os.path.join(
                     self.opts.results_dir,
-                    f"seg_{str(i).zfill(5)}_loc_loss={localization_loss.item():.4f}.jpg",
+                    f"seg_{str(i).zfill(5)}.jpg",
                 ),
             )
 
