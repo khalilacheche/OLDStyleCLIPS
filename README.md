@@ -1,5 +1,5 @@
 
-# GAN-based Face Editing with Textual Descriptions
+# OLDStyleCLIPS: Empowering Image Editing with Textual Guidance using StyleGAN Latent Space Optimization, CLIP, and Image Segmentation
 Khalil Haroun Achache, Farah Briki, Haitao Zhou <br>
 
 
