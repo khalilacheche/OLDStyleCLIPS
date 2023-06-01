@@ -55,7 +55,7 @@ class LocalizationLoss(nn.Module):
         parts = {
             "mouth": ["mouth", "u_lip", "l_lip"],
             "skin": ["skin"],
-            "eyes": ["l_eye", "r_eye"],
+            "eyes": ["l_eye", "r_eye", "eyeglass"],
             "nose": ["nose"],
             "ears": ["l_ear", "r_ear", "earrings"],
             "eye_brows": ["l_brow", "r_brow"],
