@@ -11,7 +11,7 @@ Image Inversion: [![Open In Colab](https://colab.research.google.com/assets/cola
 
 ## Description
 This project aims at performing text based editing on StyleGAN2 images. It was done in the context of the course of Computational Photography (CS-413) at EPFL.
-This project is based on the paper [StyleCLIP: Text-Driven Manipulation of StyleGAN Imagery](https://arxiv.org/abs/2103.17249) by Or Patashnik, Zongze Wu, Eli Shechtman, Daniel Cohen-Or, Dani Lischinski, and Daniel Cohen and [LELSD: OPTIMIZING LATENT SPACE DIRECTIONS FOR GAN-BASED LOCAL IMAGE EDITING](https://arxiv.org/pdf/2111.12583.pdf) by Ehsan Pajouheshgar, Tong Zhang, and Sabine Susstrunk.
+This project is based on the paper [StyleCLIP: Text-Driven Manipulation of StyleGAN Imagery](https://arxiv.org/abs/2103.17249) by Or Patashnik, Zongze Wu, Eli Shechtman, Daniel Cohen-Or, Dani Lischinski, and Daniel Cohen and [LELSD: OPTIMIZING LATENT SPACE DIRECTIONS FOR GAN-BASED LOCAL IMAGE EDITING](https://arxiv.org/pdf/2111.12583.pdf) by Ehsan Pajouheshgar, Tong Zhang, and Sabine Süsstrunk.
 
 
 
