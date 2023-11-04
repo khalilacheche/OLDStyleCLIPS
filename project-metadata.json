@@ -1,9 +1,9 @@
 {
-    "title": "Fire Fighter",
-    "img_path": "https://github.com/khalilacheche/FireFighter/raw/main/image_rapport/bomr_demo.gif",
-    "description": "A robotics project",
+    "title": "OLDStyleCLIPS",
+    "img_path": "https://github.com/khalilacheche/OLDStyleCLIPS/raw/project-metadata/first_results.jpg",
+    "description": "Text Based image editing using GANs",
     "tags": [
-        "Robotics",
+        "GenAI",
         "Computer Vision"
     ],
     "langs": [
@@ -11,6 +11,6 @@
     ],
     "frameworks": [
         "OpenCV",
-        "Thymio"
+        "PyTorch"
     ]
 }
