@@ -1,0 +1,16 @@
+{
+    "title": "Fire Fighter",
+    "img_path": "https://github.com/khalilacheche/FireFighter/raw/main/image_rapport/bomr_demo.gif",
+    "description": "A robotics project",
+    "tags": [
+        "Robotics",
+        "Computer Vision"
+    ],
+    "langs": [
+        "Python"
+    ],
+    "frameworks": [
+        "OpenCV",
+        "Thymio"
+    ]
+}
