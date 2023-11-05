@@ -4,7 +4,7 @@
     "description": "Text Based image editing using GANs",
     "tags": [
         "GenAI",
-        "Computer Vision"
+        "Machine Learning"
     ],
     "langs": [
         "Python"
